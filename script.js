@@ -5,12 +5,12 @@
 window.addEventListener('DOMContentLoaded', () => {
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
-        targetX: 225,       
-        targetY: 525,       
-        targetWidth: 580,   
-        targetHeight: 315,  
-        padding: 25,        
-        defaultFontSize: 42,
+        targetX: 211,       // Tọa độ X chuẩn xác của mép trái vùng trắng
+        targetY: 531,       // Tọa độ Y chuẩn xác của mép trên vùng trắng
+        targetWidth: 610,   // Chiều rộng thực tế của bảng trắng
+        targetHeight: 303,  // Chiều cao thực tế của bảng trắng
+        padding: 35,        // Tăng khoảng cách lề an toàn lên một chút cho chữ đẹp hơn
+        defaultFontSize: 46,// Tăng kích thước chữ tối đa ban đầu lên để nhìn rõ hơn
         lineHeightRatio: 1.35, 
         fontFamily: 'Arial, sans-serif' 
     };
