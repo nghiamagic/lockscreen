@@ -1,18 +1,19 @@
 /**
- * Lockscreen Prediction System (LPS) - Real Human Brush Simulation
+ * Lockscreen Prediction System (LPS) - Permanent Marker & Brush Custom Engine
  */
 
 window.addEventListener('DOMContentLoaded', () => {
+    // Cấu hình tọa độ bảng mới ôm trọn vùng trắng trong image_048c71.jpg
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
-        targetX: 231,       
-        targetY: 770,       
-        targetWidth: 605,   
-        targetHeight: 300,  
-        padding: 30,        
-        defaultFontSize: 65,  
-        lineHeightRatio: 1.15, 
-        fontFamily: 'Arial, "Segoe UI", sans-serif' 
+        targetX: 180,       
+        targetY: 220,       
+        targetWidth: 640,   
+        targetHeight: 580,  
+        padding: 40,        
+        defaultFontSize: 110, // Tăng cỡ chữ đại bản giống mẫu
+        lineHeightRatio: 1.15,
+        fontFamily: '"Permanent Marker", Arial, sans-serif'
     };
 
     const canvas = document.getElementById('mainCanvas');
@@ -28,37 +29,39 @@ window.addEventListener('DOMContentLoaded', () => {
         const baseImage = new Image();
 
         baseImage.onload = () => {
-            const w = baseImage.naturalWidth || baseImage.width;
-            const h = baseImage.naturalHeight || baseImage.height;
+            // Chờ font load hẳn trong 400ms để không bị lỗi rụng font trên iPhone
+            setTimeout(() => {
+                const w = baseImage.naturalWidth || baseImage.width;
+                const h = baseImage.naturalHeight || baseImage.height;
 
-            canvas.width = w;
-            canvas.height = h;
+                canvas.width = w;
+                canvas.height = h;
 
-            // Vẽ ảnh nền gốc
-            ctx.drawImage(baseImage, 0, 0, w, h);
-            
-            // Vẽ chữ hiệu ứng giả lập người viết thực tế
-            renderHumanBrushText(ctx, textToRender, BOARD_CONFIG);
+                // Vẽ ảnh nền gốc
+                ctx.drawImage(baseImage, 0, 0, w, h);
+                
+                // Khởi chạy thuật toán xử lý cọ nhám Permanent Marker
+                renderPermanentMarkerText(ctx, textToRender, BOARD_CONFIG);
 
-            // Xuất file ảnh PNG cho Shortcut
-            const dataUrl = canvas.toDataURL('image/png', 1.0);
-            resultImage.src = dataUrl;
-            resultImage.style.display = 'block';
-            if (loadingDiv) loadingDiv.style.display = 'none';
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                resultImage.src = dataUrl;
+                resultImage.style.display = 'block';
+                if (loadingDiv) loadingDiv.style.display = 'none';
+            }, 400);
         };
 
         baseImage.onerror = () => {
-            if (loadingDiv) loadingDiv.innerHTML = "Lỗi: Không tải được ảnh base.png";
+            if (loadingDiv) loadingDiv.innerHTML = "Lỗi: Không tìm thấy file base.png mới.";
         };
 
         baseImage.src = BOARD_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
 
     } catch (err) {
-        if (loadingDiv) loadingDiv.innerHTML = "Lỗi hệ thống: " + err.message;
+        if (loadingDiv) loadingDiv.innerHTML = "Lỗi engine: " + err.message;
     }
 });
 
-function renderHumanBrushText(ctx, text, config) {
+function renderPermanentMarkerText(ctx, text, config) {
     const maxWidth = config.targetWidth - (config.padding * 2);
     const maxHeight = config.targetHeight - (config.padding * 2);
     
@@ -66,9 +69,9 @@ function renderHumanBrushText(ctx, text, config) {
     let lines = [];
     let totalHeight = 0;
 
-    // Tính toán số dòng và co kích thước chữ phù hợp
-    while (currentFontSize > 20) {
-        ctx.font = `900 ${currentFontSize}px ${config.fontFamily}`;
+    // Phân tách dòng chữ
+    while (currentFontSize > 30) {
+        ctx.font = `${currentFontSize}px ${config.fontFamily}`;
         lines = [];
         const rawLines = text.split('\n');
 
@@ -92,95 +95,89 @@ function renderHumanBrushText(ctx, text, config) {
         }
 
         totalHeight = lines.length * currentFontSize * config.lineHeightRatio;
-        if (totalHeight > maxHeight) currentFontSize -= 2; else break;
+        if (totalHeight > maxHeight) currentFontSize -= 4; else break;
     }
 
-    // Thiết lập hệ trục tọa độ xoay theo góc bảng
+    // Đặt trục xoay nghiêng theo góc bảng của ảnh mới (-1.2 độ)
     const centerX = config.targetX + (config.targetWidth / 2);
     const centerY = config.targetY + (config.targetHeight / 2);
 
     ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(-0.65 * Math.PI / 180); 
+    ctx.rotate(-1.2 * Math.PI / 180); 
 
-    // Dùng một canvas phụ ngầm (Scratch Canvas) để phân tách hạt mực nhằm tạo vết lem ngẫu nhiên
+    // Sử dụng Canvas phụ để xử lý hạt mực nhám
     const scratchCanvas = document.createElement('canvas');
-    scratchCanvas.width = config.targetWidth;
-    scratchCanvas.height = config.targetHeight + 50;
+    scratchCanvas.width = config.targetWidth + 100;
+    scratchCanvas.height = config.targetHeight + 100;
     const sCtx = scratchCanvas.getContext('2d');
 
-    // Cấu hình vẽ chữ gốc lên canvas ngầm
-    sCtx.font = `900 ${currentFontSize}px ${config.fontFamily}`;
+    sCtx.font = `${currentFontSize}px ${config.fontFamily}`;
     sCtx.textAlign = 'center';
     sCtx.textBaseline = 'middle';
     sCtx.lineJoin = 'round';
     sCtx.lineCap = 'round';
 
-    // Đổ mực đậm nhạt theo hiệu ứng nhấc cọ (Đầu đậm, cuối nhạt dần)
-    let gradient = sCtx.createLinearGradient(0, 0, 0, totalHeight);
-    gradient.addColorStop(0, '#121214');   // Đầu dòng mực đậm đặc nguyên bản
-    gradient.addColorStop(0.7, '#1c1c1f'); // Giữa dòng mực chuẩn bút lông
-    gradient.addColorStop(1, '#2d2d32');   // Cuối nét mực vơi dần do nhấc bút
+    // Tạo dải màu chuyển tiếp nhấc cọ: Đầu đậm cuối nhạt dần giống hệt người viết thật
+    let markerGradient = sCtx.createLinearGradient(0, 0, 0, totalHeight);
+    markerGradient.addColorStop(0, '#151518');
+    markerGradient.addColorStop(0.7, '#1f1f24');
+    markerGradient.addColorStop(1, '#33333a');
 
-    sCtx.strokeStyle = gradient;
-    sCtx.lineWidth = currentFontSize * 0.06;
-    sCtx.fillStyle = gradient;
+    sCtx.strokeStyle = markerGradient;
+    sCtx.lineWidth = currentFontSize * 0.05; // Độ dày cọ ngoài
+    sCtx.fillStyle = markerGradient;
 
     const startY = (scratchCanvas.height / 2) - (totalHeight / 2) + (currentFontSize * config.lineHeightRatio / 2);
     const sCenterX = scratchCanvas.width / 2;
 
-    // Vẽ chữ thô lên bộ nhớ đệm
+    // Thực hiện vẽ chữ in hoa phác thảo cọ lên bộ nhớ tạm
     for (let k = 0; k < lines.length; k++) {
         const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
-        sCtx.strokeText(lines[k].toUpperCase(), sCenterX, lineY);
-        sCtx.fillText(lines[k].toUpperCase(), sCenterX, lineY);
+        const cleanText = lines[k].toUpperCase();
+        
+        sCtx.strokeText(cleanText, sCenterX, lineY);
+        sCtx.fillText(cleanText, sCenterX, lineY);
     }
 
-    // THUẬT TOÁN ĐÁNH NÁT VÀ TẠO LEM MỰC NGẪU NHIÊN (MỖI LẦN CHẠY MỘT KHÁC)
+    // THUẬT TOÁN ĐÁNH NÁT VIỀN TẠO HIỆU ỨNG GAI XƯỚC MỰC BÚT LÔNG MANH MANH
     const imgData = sCtx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height);
     const data = imgData.data;
 
-    // Quét qua các pixel mực để tạo độ sần sùi (Mực lem bút lông)
     for (let y = 0; y < scratchCanvas.height; y++) {
         for (let x = 0; x < scratchCanvas.width; x++) {
             const alphaIndex = (y * scratchCanvas.width + x) * 4 + 3;
             const alpha = data[alphaIndex];
 
-            if (alpha > 30) {
-                // Tạo biến thiên ngẫu nhiên (Random biến dạng nét viền chữ)
-                if (Math.random() > 0.35) {
-                    // Phun hạt mực lem ngẫu nhiên ra rìa ngoài từ 1-2 pixel
-                    const bleedX = x + Math.floor((Math.random() - 0.5) * 3);
-                    const bleedY = y + Math.floor((Math.random() - 0.5) * 3);
-                    
-                    if (bleedX >= 0 && bleedX < scratchCanvas.width && bleedY >= 0 && bleedY < scratchCanvas.height) {
-                        const targetAlphaIndex = (bleedY * scratchCanvas.width + bleedX) * 4 + 3;
-                        // Đổ mực lem với độ mờ ngẫu nhiên tự nhiên
-                        if (data[targetAlphaIndex] < 150) {
-                            data[targetAlphaIndex] = alpha * (0.2 + Math.random() * 0.4);
+            if (alpha > 40) {
+                // Đánh gai rìa chữ ngẫu nhiên
+                if (Math.random() > 0.4) {
+                    const bX = x + Math.floor((Math.random() - 0.5) * 4);
+                    const bY = y + Math.floor((Math.random() - 0.5) * 4);
+                    if (bX >= 0 && bX < scratchCanvas.width && bY >= 0 && bY < scratchCanvas.height) {
+                        const tIndex = (bY * scratchCanvas.width + bX) * 4 + 3;
+                        if (data[tIndex] < 140) {
+                            data[tIndex] = alpha * (0.25 + Math.random() * 0.35);
                         }
                     }
                 }
-                
-                // Giảm bớt ngẫu nhiên độ đậm trong lòng chữ để tạo vệt xước sớ bảng gồ ghề
-                if (Math.random() > 0.96) {
-                    data[alphaIndex] = alpha * 0.4;
+                // Đục lỗ sớ xước siêu nhỏ dọc thân chữ để giả lập bề mặt bảng mica bám mực không đều
+                if (Math.random() > 0.95) {
+                    data[alphaIndex] = alpha * 0.3;
                 }
             }
         }
     }
 
-    // Cập nhật lại dữ liệu hạt mực đã loang lem ngẫu nhiên vào canvas phụ
     sCtx.putImageData(imgData, 0, 0);
 
-    // Đổ bóng mờ mịn cuối cùng cho khối mực tiệp hoàn toàn vào bề mặt bảng
-    ctx.shadowColor = 'rgba(10, 10, 12, 0.25)';
-    ctx.shadowBlur = 1.5;
-    ctx.shadowOffsetX = 0.5;
-    ctx.shadowOffsetY = 0.5;
+    // Đổ bóng mờ tĩnh tạo độ chìm thực tế
+    ctx.shadowColor = 'rgba(15, 15, 18, 0.3)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 0.8;
+    ctx.shadowOffsetY = 0.8;
 
-    // Vẽ canvas chứa chữ đã lem hoàn hảo lên ảnh nền gốc
+    // Ghép chữ đã xử lý hạt nhám lên bảng
     ctx.drawImage(scratchCanvas, -scratchCanvas.width / 2, -scratchCanvas.height / 2);
-
     ctx.restore();
 }
