@@ -1,102 +1,83 @@
-/**
- * Lockscreen Prediction System (LPS) - Core Engine
- * Phát triển cho: nghiamagic/lockscreen
- */
-
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Cấu hình tọa độ vùng viết chữ trên tấm bảng (đã đo đạc từ base.png)
+    // 1. Cấu hình tọa độ vùng viết chữ trên bảng trắng (Bản gốc base.png)
     const BOARD_CONFIG = {
-        baseImageSrc: 'base.png',
-        targetX: 225,       // Tọa độ X góc trên bên trái vùng trắng
-        targetY: 525,       // Tọa độ Y góc trên bên trái vùng trắng
-        targetWidth: 580,   // Chiều rộng vùng viết chữ
-        targetHeight: 315,  // Chiều cao vùng viết chữ
-        padding: 25,        // Khoảng cách an toàn từ lề bảng vào trong chữ
-        defaultFontSize: 42,// Kích cỡ chữ tối đa ban đầu
-        lineHeightRatio: 1.35, // Khoảng cách giữa các dòng
-        fontFamily: 'Arial, sans-serif' // Font mặc định (Hỗ trợ tiếng Việt tốt)
+        startX: 222,      // Tọa độ X góc trên bên trái vùng trắng
+        startY: 532,      // Tọa độ Y góc trên bên trái vùng trắng
+        width: 580,       // Chiều rộng tối đa của vùng viết chữ
+        height: 300,      // Chiều cao tối đa của vùng viết chữ
+        defaultFontSize: 42, // Cỡ chữ lớn nhất ban đầu
+        minFontSize: 18,  // Cỡ chữ nhỏ nhất có thể co lại nếu chữ quá dài
+        lineHeightRatio: 1.25, // Khoảng cách dòng
+        fontFamily: '"Patrick Hand", "Sriracha", cursive',
+        textColor: '#1a1a1a' // Màu mực bút lông đen hơi nhạt tự nhiên
     };
 
-    const canvas = document.getElementById('mainCanvas');
-    const ctx = canvas.getContext('2d');
-    const resultImage = document.getElementById('resultImage');
-    const loadingDiv = document.getElementById('loading');
-
-    // 2. Lấy tham số "text" từ URL query (?text=Nội dung cần viết)
+    // 2. Lấy tham số text từ URL (?text=Nội dung cần ghi)
     const urlParams = new URLSearchParams(window.location.search);
-    let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nĐã tích hợp thành công!\nSẵn sàng render nội dung tùy chỉnh.";
+    let textToRender = urlParams.get('text') || "Chào bạn!\nHệ thống LPS đã sẵn sàng.";
     
-    // Hỗ trợ ký tự xuống dòng thực tế \n nếu được truyền từ Shortcut dưới dạng chuỗi literal
+    // Hỗ trợ ký tự xuống dòng thực tế \n nếu truyền từ Shortcut ngắt dòng
     textToRender = textToRender.replace(/\\n/g, '\n');
 
-    // 3. Tiến hành tải ảnh base.png và vẽ lên canvas
+    const canvas = document.getElementById('lockscreenCanvas');
+    const ctx = canvas.getContext('2d');
+    const resultImg = document.getElementById('resultImage');
+    const loadingDiv = document.getElementById('loading');
+
+    // 3. Tải ảnh nền base.png
     const baseImage = new Image();
-    baseImage.src = BOARD_CONFIG.baseImageSrc;
-    
+    baseImage.src = 'base.png'; // Đảm bảo tệp base.png nằm cùng thư mục
+
     baseImage.onload = () => {
         // Thiết lập kích thước canvas bằng chính xác kích thước ảnh gốc
         canvas.width = baseImage.width;
         canvas.height = baseImage.height;
 
-        // Vẽ ảnh nền lên trước
+        // Vẽ ảnh gốc lên canvas trước
         ctx.drawImage(baseImage, 0, 0);
 
-        // Khởi chạy bộ xử lý render văn bản nâng cao
-        renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
+        // Tiến hành tính toán cấu trúc chữ viết và render
+        renderTextWithAutoFit(ctx, textToRender, BOARD_CONFIG);
 
-        // Xuất canvas thành ảnh PNG chất lượng cao nhất để Shortcut sử dụng
-        const dataUrl = canvas.toDataURL('image/png', 1.0);
-        resultImage.src = dataUrl;
-        resultImage.style.display = 'block';
+        // Xuất kết quả cuối cùng ra thẻ <img> dưới dạng PNG chất lượng cao
+        resultImg.src = canvas.toDataURL('image/png');
+        resultImg.style.display = 'block';
         loadingDiv.style.display = 'none';
     };
 
     baseImage.onerror = () => {
-        loadingDiv.innerText = "Lỗi: Không thể tải file base.png. Hãy chắc chắn file nằm cùng thư mục.";
-        loadingDiv.style.color = '#ff4d4d';
+        loadingDiv.innerText = "Lỗi: Không thể tải ảnh nền base.png!";
     };
 });
 
 /**
- * Hàm xử lý thuật toán tự động wrap chữ, tự động co font và căn giữa
+ * Thuật toán tự động tính toán kích thước, xuống dòng và căn giữa chữ viết trên bảng
  */
-function renderTextOnBoard(ctx, text, config) {
-    const maxWidth = config.targetWidth - (config.padding * 2);
-    const maxHeight = config.targetHeight - (config.padding * 2);
-    
+function renderTextWithAutoFit(ctx, text, config) {
     let currentFontSize = config.defaultFontSize;
     let lines = [];
-    let totalHeight = 0;
+    let totalTextHeight = 0;
 
-    // Vòng lặp tối ưu hóa kích thước chữ (Auto-scale): 
-    // Nếu chữ quá dài, tự động giảm fontSize từng chút một cho đến khi vừa vặn với chiều cao và chiều rộng của bảng.
-    while (currentFontSize > 14) {
-        ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
+    // Tách các đoạn văn bản nếu người dùng chủ động nhấn xuống dòng trước
+    const paragraphs = text.split('\n');
+
+    // Vòng lặp hạ kích thước font chữ nếu tổng chiều cao vượt quá giới hạn bảng
+    while (currentFontSize >= config.minFontSize) {
+        ctx.font = `${currentFontSize}px ${config.fontFamily}`;
         lines = [];
         
-        // Tách văn bản theo các dấu xuống dòng chủ động (\n) trước
-        const rawLines = text.split('\n');
-        
-        let fitsPerfect = true;
-
-        for (let i = 0; i < rawLines.length; i++) {
-            const words = rawLines[i].split(' ');
+        // Xử lý xuống dòng tự động cho từng đoạn văn bản dựa trên chiều rộng (Width)
+        for (let i = 0; i < paragraphs.length; i++) {
+            const words = paragraphs[i].split(' ');
             let currentLine = '';
 
-            for (let j = 0; j < words.length; j++) {
-                let testLine = currentLine + (currentLine ? ' ' : '') + words[j];
+            for (let n = 0; n < words.length; n++) {
+                let testLine = currentLine + (currentLine ? ' ' : '') + words[n];
                 let metrics = ctx.measureText(testLine);
                 
-                if (metrics.width > maxWidth) {
-                    // Nếu từ đầu tiên đã dài hơn chiều rộng cho phép, bắt buộc phải xuống dòng
-                    if (currentLine === '') {
-                        currentLine = testLine;
-                        lines.push(currentLine);
-                        currentLine = '';
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = words[j];
-                    }
+                if (metrics.width > config.width && n > 0) {
+                    lines.push(currentLine);
+                    currentLine = words[n];
                 } else {
                     currentLine = testLine;
                 }
@@ -106,31 +87,41 @@ function renderTextOnBoard(ctx, text, config) {
             }
         }
 
-        // Tính toán tổng chiều cao khối chữ sau khi đã wrap dòng
-        totalHeight = lines.length * currentFontSize * config.lineHeightRatio;
+        // Tính toán tổng chiều cao của toàn bộ các dòng chữ sau khi wrap
+        const lineHeight = currentFontSize * config.lineHeightRatio;
+        totalTextHeight = lines.length * lineHeight;
 
-        // Nếu tổng chiều cao chữ vượt quá chiều cao tối đa của tấm bảng, tiếp tục giảm font size
-        if (totalHeight > maxHeight) {
-            currentFontSize -= 2; // Giảm kích thước font và tính toán lại từ đầu
-        } else {
-            break; // Đã tìm thấy kích thước font phù hợp lý tưởng
+        // Nếu tổng chiều cao chữ nhỏ hơn chiều cao bảng, kích thước font này đã chuẩn
+        if (totalTextHeight <= config.height) {
+            break;
         }
+
+        // Ngược lại, hạ cỡ chữ xuống 2 đơn vị và tính toán lại từ đầu
+        currentFontSize -= 2;
     }
 
-    // 4. Tiến hành vẽ chữ lên bảng với tọa độ đã được căn giữa hoàn hảo
-    ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#1c1c1e'; // Màu mực bút lông đen (hơi xám nhẹ cho tự nhiên)
+    // Thiết lập lại thuộc tính vẽ chữ cuối cùng
+    ctx.font = `${currentFontSize}px ${config.fontFamily}`;
+    ctx.fillStyle = config.textColor;
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'center'; // Căn giữa dòng chữ theo trục dọc X
 
-    // Tính toán điểm Y bắt đầu (Căn giữa theo chiều dọc của bảng)
-    const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2 + (currentFontSize * config.lineHeightRatio / 2);
-    // Tính toán điểm X chính giữa bảng
-    const centerX = config.targetX + (config.targetWidth / 2);
+    const lineHeight = currentFontSize * config.lineHeightRatio;
+    
+    // Tính toán điểm bắt đầu vẽ Y sao cho khối chữ nằm chính giữa bảng theo chiều dọc (Vertical Center)
+    const centerYOffset = config.startY + (config.height - totalTextHeight) / 2;
+    // Điểm chính giữa bảng theo chiều ngang
+    const centerX = config.startX + (config.width / 2);
 
-    // Vẽ từng dòng chữ
-    for (let k = 0; k < lines.length; k++) {
-        const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
-        ctx.fillText(lines[k], centerX, lineY);
-    }
+    // Tiến hành vẽ từng dòng lên canvas
+    lines.forEach((line, index) => {
+        const lineY = centerYOffset + (index * lineHeight);
+        
+        // Tạo một độ nghiêng chữ cực kỳ nhẹ (tầm 0.3 độ) cho tự nhiên giống người viết tay thật
+        ctx.save();
+        ctx.translate(centerX, lineY);
+        ctx.rotate(0.005); // Góc xoay rất nhỏ tính bằng radian (~0.28 độ)
+        ctx.fillText(line, 0, 0);
+        ctx.restore();
+    });
 }
