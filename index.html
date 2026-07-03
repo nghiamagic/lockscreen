@@ -1,16 +1,12 @@
-
-   
-
-
+<!-- Nhúng font chữ Google Font kiểu viết tay hỗ trợ tiếng Việt tốt -->
+//<!-- <link rel="preconnect" href="https://fonts.googleapis.com">
+  //  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ //   <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Sriracha&display=swap" rel="stylesheet"> -->
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Nhúng font chữ Google Font kiểu viết tay hỗ trợ tiếng Việt tốt -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Sriracha&display=swap" rel="stylesheet">
     <title>Lockscreen Generator</title>
     <style>
         body {
@@ -23,12 +19,11 @@
             min-height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        /* Đảm bảo ảnh kết quả hiển thị full màn hình điện thoại/máy tính */
         #resultImage {
             max-width: 100%;
             max-height: 100vh;
             object-fit: contain;
-            display: none; /* Sẽ được script.js bật thành 'block' khi vẽ xong */
+            display: none; /* Sẽ hiện khi vẽ xong */
         }
         #loading {
             position: fixed;
@@ -37,7 +32,7 @@
             text-align: center;
         }
         canvas {
-            display: none !important; /* Luôn ẩn canvas ngầm */
+            display: none !important;
         }
     </style>
 </head>
@@ -45,12 +40,10 @@
 
     <div id="loading">Đang khởi tạo engine hình nền...</div>
     
-    <!-- Ảnh kết quả cuối cùng để Shortcut tải về -->
     <img id="resultImage" alt="Lockscreen Result" />
     
-    <!-- Canvas ngầm xử lý ảnh -->
     <canvas id="mainCanvas"></canvas>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=9999"></script>
 </body>
 </html>
