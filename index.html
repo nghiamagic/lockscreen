@@ -1,211 +1,42 @@
-<!-- Nhúng font chữ Google Font kiểu viết tay hỗ trợ tiếng Việt tốt -->
-//<!-- <link rel="preconnect" href="https://fonts.googleapis.com">
-  //  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
- //   <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Sriracha&display=swap" rel="stylesheet"> -->
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lockscreen Tweak Center</title>
+    <title>Lockscreen Prediction Engine</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             background: #111;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
             min-height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        #container {
-            position: relative;
-            width: 100%;
-            max-width: 500px;
-            margin-bottom: 220px; /* Chừa chỗ cho bảng điều khiển */
-        }
         #resultImage {
-            width: 100%;
-            display: block;
+            max-width: 100%;
+            max-height: 100vh;
+            object-fit: contain;
+            display: none; /* Hiện lên khi script vẽ xong */
+        }
+        #loading {
+            position: fixed;
+            color: #ffffff;
+            font-size: 16px;
         }
         canvas {
             display: none !important;
-        }
-        #controlPanel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(15, 15, 15, 0.95);
-            color: #fff;
-            padding: 15px;
-            font-family: monospace;
-            z-index: 9999;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
-            border-top: 1px solid #333;
-        }
-        .slider-group {
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-        }
-        .slider-group label {
-            width: 100px;
-            font-size: 12px;
-        }
-        .slider-group input {
-            flex: 1;
-        }
-        .slider-group span {
-            width: 40px;
-            text-align: right;
-            font-size: 12px;
-            margin-left: 5px;
         }
     </style>
 </head>
 <body>
 
-    <div id="container">
-        <img id="resultImage" alt="Loading..." />
-    </div>
-    
+    <div id="loading">Đang khởi tạo hình nền...</div>
+    <img id="resultImage" alt="Lockscreen Result" />
     <canvas id="mainCanvas"></canvas>
 
-    <div id="controlPanel">
-        <div style="font-weight:bold;color:#4af;margin-bottom:8px;font-size:14px;">🛠️ KÉO THANH ĐỂ ĐẨY CHỮ VÀO BẢNG:</div>
-        
-        <div class="slider-group">
-            <label>Trục X (Ngang):</label>
-            <input type="range" id="sliderX" min="0" max="1000" value="215">
-            <span id="valX">215</span>
-        </div>
-        
-        <div class="slider-group" style="background: rgba(255,255,0,0.1); padding: 4px 0;">
-            <label style="color: #ff0; font-weight: bold;">Trục Y (Dọc):</label>
-            <input type="range" id="sliderY" min="0" max="1500" value="750">
-            <span id="valY">750</span>
-        </div>
-        
-        <div class="slider-group">
-            <label>Chiều RỘNG bảng:</label>
-            <input type="range" id="sliderW" min="100" max="1000" value="605">
-            <span id="valW">605</span>
-        </div>
-        
-        <div class="slider-group">
-            <label>Chiều CAO bảng:</label>
-            <input type="range" id="sliderH" min="50" max="800" value="300">
-            <span id="valH">300</span>
-        </div>
-        
-        <div class="slider-group">
-            <label>Cỡ chữ tối đa:</label>
-            <input type="range" id="sliderFS" min="10" max="120" value="44">
-            <span id="valFS">44</span>
-        </div>
-
-        <div style="color:#0f0; margin-top:5px; font-size:11px;">👉 COPIED CODE KHI CHỈNH XONG:</div>
-        <input type="text" id="codeOutput" style="width:100%; background:#222; color:#fff; border:1px solid #444; font-size:11px; padding:3px;" readonly />
-    </div>
-
-    <script>
-        // Tọa độ cấu hình động
-        let CONFIG = {
-            baseImageSrc: 'base.png',
-            targetX: 215,
-            targetY: 750, // Đặt sẵn giá trị lớn để chữ tụt hẳn xuống vùng bảng
-            targetWidth: 605,
-            targetHeight: 300,
-            padding: 30,
-            defaultFontSize: 44,
-            lineHeightRatio: 1.4,
-            fontFamily: 'Arial, sans-serif'
-        };
-
-        const canvas = document.getElementById('mainCanvas');
-        const ctx = canvas.getContext('2d');
-        const resultImage = document.getElementById('resultImage');
-
-        const baseImage = new Image();
-
-        function render() {
-            const w = baseImage.naturalWidth || baseImage.width;
-            const h = baseImage.naturalHeight || baseImage.height;
-            if (w === 0 || h === 0) return;
-
-            canvas.width = w;
-            canvas.height = h;
-            ctx.drawImage(baseImage, 0, 0, w, h);
-
-            const urlParams = new URLSearchParams(window.location.search);
-            let text = urlParams.get('text') || "Chao Ban\nKéo thanh Y bên dưới\nđể căn chỉnh!";
-            text = text.replace(/\\n/g, '\n');
-
-            // Thuật toán co chữ
-            let currentFontSize = CONFIG.defaultFontSize;
-            let lines = [];
-            let totalHeight = 0;
-            const maxWidth = CONFIG.targetWidth - (CONFIG.padding * 2);
-            const maxHeight = CONFIG.targetHeight - (CONFIG.padding * 2);
-
-            while (currentFontSize > 12) {
-                ctx.font = `bold ${currentFontSize}px ${CONFIG.fontFamily}`;
-                lines = [];
-                const rawLines = text.split('\n');
-                for (let i = 0; i < rawLines.length; i++) {
-                    const words = rawLines[i].split(' ');
-                    let currentLine = '';
-                    for (let j = 0; j < words.length; j++) {
-                        let testLine = currentLine + (currentLine ? ' ' : '') + words[j];
-                        if (ctx.measureText(testLine).width > maxWidth) {
-                            if (currentLine === '') { currentLine = testLine; lines.push(currentLine); currentLine = ''; }
-                            else { lines.push(currentLine); currentLine = words[j]; }
-                        } else { currentLine = testLine; }
-                    }
-                    if (currentLine) lines.push(currentLine);
-                }
-                totalHeight = lines.length * currentFontSize * CONFIG.lineHeightRatio;
-                if (totalHeight > maxHeight) currentFontSize -= 1; else break;
-            }
-
-            ctx.font = `bold ${currentFontSize}px ${CONFIG.fontFamily}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillStyle = '#1c1c1e';
-
-            const startY = CONFIG.targetY + CONFIG.padding + (maxHeight - totalHeight) / 2;
-            const centerX = CONFIG.targetX + (CONFIG.targetWidth / 2);
-
-            for (let k = 0; k < lines.length; k++) {
-                ctx.fillText(lines[k], centerX, startY + (k * currentFontSize * CONFIG.lineHeightRatio));
-            }
-
-            resultImage.src = canvas.toDataURL('image/png', 1.0);
-            document.getElementById('codeOutput').value = `targetX: ${CONFIG.targetX}, targetY: ${CONFIG.targetY}, targetWidth: ${CONFIG.targetWidth}, targetHeight: ${CONFIG.targetHeight}, defaultFontSize: ${CONFIG.defaultFontSize}`;
-        }
-
-        baseImage.onload = () => {
-            render();
-            
-            // Khởi tạo sự kiện thanh kéo trực tiếp
-            const setupSlider = (id, key, valId) => {
-                document.getElementById(id).addEventListener('input', (e) => {
-                    CONFIG[key] = parseInt(e.target.value);
-                    document.getElementById(valId).innerText = e.target.value;
-                    render();
-                });
-            };
-            
-            setupSlider('sliderX', 'targetX', 'valX');
-            setupSlider('sliderY', 'targetY', 'valY');
-            setupSlider('sliderW', 'targetWidth', 'valW');
-            setupSlider('sliderH', 'targetHeight', 'valH');
-            setupSlider('sliderFS', 'defaultFontSize', 'valFS');
-        };
-
-        baseImage.src = CONFIG.baseImageSrc + '?v=' + new Date().getTime();
-    </script>
+    <script src="script.js?v=production_v1"></script>
 </body>
 </html>
