@@ -1,17 +1,17 @@
 /**
- * Lockscreen Prediction System (LPS) - Bộ Engine Tính Toán Theo Tỷ Lệ Phần Trăm %
+ * Lockscreen Prediction System (LPS) - Bộ Engine Tính Toán Chuẩn Tỷ Lệ %
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Cấu hình tỷ lệ % hình học của tấm bảng so với tổng thể bức ảnh
+    // Cấu hình tỷ lệ % hình học của tấm bảng so với tổng thể bức ảnh base.png
     const BOARD_PERCENT_CONFIG = {
         baseImageSrc: 'base.png',
-        xRatio: 0.215,       // Tương đương 21.5% từ lề trái vào
-        yRatio: 0.353,       // Tương đương 35.3% từ lề trên xuống
-        widthRatio: 0.605,   // Tương đương 60.5% chiều rộng ảnh
-        heightRatio: 0.206,  // Tương đương 20.6% chiều cao ảnh
+        xRatio: 0.215,       // 21.5% từ lề trái vào
+        yRatio: 0.353,       // 35.3% từ lề trên xuống
+        widthRatio: 0.605,   // 60.5% chiều rộng ảnh
+        heightRatio: 0.206,  // 20.6% chiều cao ảnh
         paddingRatio: 0.04,  // Lề an toàn bên trong bảng
-        fontRatio: 0.03,     // Cỡ chữ mặc định bằng 3% chiều cao ảnh
+        fontRatio: 0.038,    // Cỡ chữ tối đa ban đầu
         fontFamily: 'Arial, sans-serif'
     };
 
@@ -34,19 +34,19 @@ window.addEventListener('DOMContentLoaded', () => {
         const baseImage = new Image();
 
         baseImage.onload = () => {
-            // Lấy kích thước thực tế mà trình duyệt cấp cho ảnh
-            const w = baseImage.width;
-            const h = baseImage.height;
+            // Lấy kích thước thực tế của ảnh
+            const w = baseImage.naturalWidth || baseImage.width;
+            const h = baseImage.naturalHeight || baseImage.height;
 
             if (w === 0 || h === 0) {
-                showError("Trình duyệt chưa đọc được kích thước ảnh.");
+                showError("Trình duyệt chưa đọc được kích thước ảnh nguồn.");
                 return;
             }
 
             canvas.width = w;
             canvas.height = h;
 
-            // Vẽ ảnh gốc
+            // Vẽ ảnh gốc lên trước
             ctx.drawImage(baseImage, 0, 0, w, h);
             
             // Tính toán tọa độ pixel động dựa trên tỷ lệ %
@@ -61,10 +61,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 fontFamily: BOARD_PERCENT_CONFIG.fontFamily
             };
 
-            // Vẽ chữ đè lên bảng bằng tọa độ động vừa tính
+            // Vẽ chữ lên bảng bằng cấu hình động vừa tính
             renderTextOnBoard(ctx, textToRender, dynamicConfig);
 
-            // Xuất ảnh kết quả
+            // Xuất ảnh kết quả dạng PNG chất lượng cao
             const dataUrl = canvas.toDataURL('image/png', 1.0);
             resultImage.src = dataUrl;
             resultImage.style.display = 'block';
@@ -72,7 +72,7 @@ window.addEventListener('DOMContentLoaded', () => {
         };
 
         baseImage.onerror = () => {
-            showError(`Không thể tải file ảnh nguồn.`);
+            showError(`Không thể tải file ảnh nguồn base.png.`);
         };
 
         baseImage.src = BOARD_PERCENT_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
@@ -90,7 +90,7 @@ function renderTextOnBoard(ctx, text, config) {
     let lines = [];
     let totalHeight = 0;
 
-    // Thuật toán tự động xuống dòng và co chữ
+    // Thuật toán tự động xuống dòng và co chữ cho vừa vặn
     while (currentFontSize > 12) {
         ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
         lines = [];
@@ -131,15 +131,17 @@ function renderTextOnBoard(ctx, text, config) {
         }
     }
 
-    // Tiến hành vẽ chữ phẳng
+    // Thiết lập vẽ chữ phẳng chính xác
     ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top'; 
-    ctx.fillStyle = '#1c1c1e'; 
+    ctx.fillStyle = '#1c1c1e'; // Màu đen mực bút viết bảng tự nhiên
 
+    // Căn giữa khối chữ theo chiều dọc và ngang của vùng trắng
     const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2;
     const centerX = config.targetX + (config.targetWidth / 2);
 
+    // Tiến hành vẽ chữ
     for (let k = 0; k < lines.length; k++) {
         const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
         ctx.fillText(lines[k], centerX, lineY);
