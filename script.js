@@ -1,19 +1,19 @@
 /**
- * Lockscreen Prediction System (LPS) - Brush Art & Rotate Engine
+ * Lockscreen Prediction System (LPS) - Bản tái tạo cọ Marker xước theo hình mẫu
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Khóa cứng bộ thông số chuẩn của bạn kết hợp Font viết tay mới
+    // Giữ nguyên bộ tọa độ chuẩn bạn đã tìm ra
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
         targetX: 231,       
         targetY: 770,       
         targetWidth: 605,   
         targetHeight: 300,  
-        padding: 35,        // Tăng padding để chữ viết tay uốn lượn không bị chạm viền
-        defaultFontSize: 46,
-        lineHeightRatio: 1.3, // Font viết tay cần khoảng cách dòng hẹp hơn một chút để tự nhiên
-        fontFamily: '"Pattaya", cursive' // Áp dụng font viết tay nghệ thuật
+        padding: 30,        
+        defaultFontSize: 65,  // Tăng cỡ chữ lớn lên để bung nét cọ thô như hình mẫu
+        lineHeightRatio: 1.15, // Khoảng cách dòng khít nhau giống như mẫu
+        fontFamily: 'Arial, "Segoe UI", sans-serif' // Dùng font dày bản để bo viền cọ
     };
 
     const canvas = document.getElementById('mainCanvas');
@@ -23,32 +23,29 @@ window.addEventListener('DOMContentLoaded', () => {
 
     try {
         const urlParams = new URLSearchParams(window.location.search);
-        let textToRender = urlParams.get('text') || "Chào Bạn Nghi\nYêu Gấu!";
+        let textToRender = urlParams.get('text') || "PHẠM\nQUỐC\nNGHĨA";
         textToRender = textToRender.replace(/\\n/g, '\n');
 
         const baseImage = new Image();
 
         baseImage.onload = () => {
-            // Chờ thêm 300ms để đảm bảo trình duyệt đã kích hoạt Font viết tay thành công
-            setTimeout(() => {
-                const w = baseImage.naturalWidth || baseImage.width;
-                const h = baseImage.naturalHeight || baseImage.height;
+            const w = baseImage.naturalWidth || baseImage.width;
+            const h = baseImage.naturalHeight || baseImage.height;
 
-                canvas.width = w;
-                canvas.height = h;
+            canvas.width = w;
+            canvas.height = h;
 
-                // Vẽ ảnh nền
-                ctx.drawImage(baseImage, 0, 0, w, h);
-                
-                // Tiến hành vẽ chữ hiệu ứng bút lông nghiêng tự nhiên
-                renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
+            // Vẽ ảnh nền gốc
+            ctx.drawImage(baseImage, 0, 0, w, h);
+            
+            // Vẽ chữ cọ xước
+            renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
 
-                // Xuất ra ảnh PNG cuối cùng
-                const dataUrl = canvas.toDataURL('image/png', 1.0);
-                resultImage.src = dataUrl;
-                resultImage.style.display = 'block';
-                if (loadingDiv) loadingDiv.style.display = 'none';
-            }, 300);
+            // Xuất file ảnh PNG sạch sẽ cho Shortcut
+            const dataUrl = canvas.toDataURL('image/png', 1.0);
+            resultImage.src = dataUrl;
+            resultImage.style.display = 'block';
+            if (loadingDiv) loadingDiv.style.display = 'none';
         };
 
         baseImage.onerror = () => {
@@ -70,9 +67,9 @@ function renderTextOnBoard(ctx, text, config) {
     let lines = [];
     let totalHeight = 0;
 
-    // Thuật toán tự động xuống dòng và co chữ
-    while (currentFontSize > 14) {
-        ctx.font = `${currentFontSize}px ${config.fontFamily}`;
+    // Tự động tính toán số dòng và co chữ
+    while (currentFontSize > 20) {
+        ctx.font = `900 ${currentFontSize}px ${config.fontFamily}`; // Độ dày tối đa 900
         lines = [];
         const rawLines = text.split('\n');
 
@@ -102,36 +99,47 @@ function renderTextOnBoard(ctx, text, config) {
         if (totalHeight > maxHeight) currentFontSize -= 2; else break;
     }
 
-    // TÍNH TOÁN TÂM HÌNH HỌC TẤM BẢNG ĐỂ XOAY KHÔNG BỊ LỆCH TRỤC
+    // TÍNH TOÁN XOAY TÂM BẢNG ĐỂ CHỮ NGHIÊNG THEO THỚ GỖ TỰ NHIÊN
     const centerX = config.targetX + (config.targetWidth / 2);
     const centerY = config.targetY + (config.targetHeight / 2);
 
-    ctx.save(); // Lưu trạng thái canvas phẳng
-
-    // Dịch tâm vẽ về chính giữa bảng và xoay nhẹ -0.65 độ theo dáng đứng thực tế
+    ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate(-0.65 * Math.PI / 180);
+    ctx.rotate(-0.65 * Math.PI / 180); // Độ nghiêng khớp theo mặt bảng thực tế
 
-    // THIẾT LẬP HIỆU ỨNG BÚT LÔNG (BRUSH EFFECT)
-    ctx.font = `${currentFontSize}px ${config.fontFamily}`;
+    // TÁI TẠO CẤU HÌNH ĐƯỜNG CỌ MARKER (Dựa theo ảnh mẫu đính kèm)
+    ctx.font = `900 ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle'; 
-    ctx.fillStyle = '#1e1e21'; // Màu mực bút lông đen xám tự nhiên
+    ctx.lineJoin = 'round'; // Bo tròn điểm nối nét
+    ctx.lineCap = 'round';  // Bo tròn đầu bút lông
 
-    // Đổ bóng nhòe nhẹ tạo hiệu ứng mực thấm (Bleeding) vào sớ bảng trắng
-    ctx.shadowColor = 'rgba(30, 30, 33, 0.4)';
-    ctx.shadowBlur = 1.5;
-    ctx.shadowOffsetX = 0.5;
-    ctx.shadowOffsetY = 0.5;
+    // Tạo nét xước lông bằng viền stroke ngoài
+    ctx.strokeStyle = '#101012'; 
+    ctx.lineWidth = currentFontSize * 0.08; // Độ dày viền tương xứng tỉ lệ chữ
 
-    // Tính điểm Y bắt đầu tương đối từ tâm xoay 0
+    // Đổ mực đặc vào lòng chữ
+    ctx.fillStyle = '#161619'; 
+
+    // Đổ bóng mờ tạo độ nhòe thấm mực bút lông viết bảng
+    ctx.shadowColor = 'rgba(16, 16, 19, 0.35)';
+    ctx.shadowBlur = 2;
+    ctx.shadowOffsetX = 1;
+    ctx.shadowOffsetY = 1;
+
+    // Vị trí dòng đầu tiên tương đối từ tâm xoay
     const startY = - (totalHeight / 2) + (currentFontSize * config.lineHeightRatio / 2);
 
-    // Vẽ từng dòng chữ uốn lượn nghệ thuật
+    // Tiến hành vẽ kép (Stroke viền cọ trước, Fill mực đè lên sau) tạo hiệu ứng nhám xước
     for (let k = 0; k < lines.length; k++) {
         const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
-        ctx.fillText(lines[k], 0, lineY);
+        
+        // Vẽ viền nhám phác họa của cọ trước
+        ctx.strokeText(lines[k].toUpperCase(), 0, lineY); // Chuyển chữ in hoa để bung tối đa nét cọ
+        
+        // Đổ mực bút lông đè lòng sau
+        ctx.fillText(lines[k].toUpperCase(), 0, lineY);
     }
 
-    ctx.restore(); // Khôi phục trạng thái canvas gốc
+    ctx.restore();
 }
