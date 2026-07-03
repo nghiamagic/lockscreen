@@ -3,7 +3,7 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Sử dụng chính xác bộ thông số bạn đã căn chỉnh thành công
+    // Khóa cứng bộ thông số chuẩn xác bạn đã chỉnh tay thành công
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
         targetX: 231,       
@@ -23,7 +23,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     try {
         const urlParams = new URLSearchParams(window.location.search);
-        let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nĐã tích hợp thành công!\nSẵn sàng nhận lệnh từ Shortcut.";
+        let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nSẵn sàng nhận lệnh.";
         textToRender = textToRender.replace(/\\n/g, '\n');
 
         const baseImage = new Image();
@@ -67,7 +67,6 @@ function renderTextOnBoard(ctx, text, config) {
     let lines = [];
     let totalHeight = 0;
 
-    // Thuật toán tự động xuống dòng và co chữ
     while (currentFontSize > 12) {
         ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
         lines = [];
@@ -102,7 +101,7 @@ function renderTextOnBoard(ctx, text, config) {
     ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top'; 
-    ctx.fillStyle = '#1c1c1e'; // Màu đen mực bút lông tự nhiên
+    ctx.fillStyle = '#1c1c1e'; 
 
     const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2;
     const centerX = config.targetX + (config.targetWidth / 2);
