@@ -1176,4 +1176,4 @@ function applyEdgeRoughness(canvas) {
     // Ghép chữ đã xử lý hạt nhám lên bảng
     ctx.drawImage(scratchCanvas, -scratchCanvas.width / 2, -scratchCanvas.height / 2);
     ctx.restore();
-}
+
