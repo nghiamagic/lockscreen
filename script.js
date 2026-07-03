@@ -1,19 +1,18 @@
 /**
- * Lockscreen Prediction System (LPS) - Core Engine
+ * Lockscreen Prediction System (LPS) - Bộ Engine Tính Toán Theo Tỷ Lệ Phần Trăm %
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Tọa độ chuẩn xác 100% đo bằng pixel thực tế trên ảnh gốc base.png
-    const BOARD_CONFIG = {
-        baseImageSrc: 'base.png', 
-        targetX: 215,       // Mép trái vùng trắng
-        targetY: 530,       // Mép trên vùng trắng
-        targetWidth: 605,   // Chiều rộng vùng trắng
-        targetHeight: 300,  // Chiều cao vùng trắng
-        padding: 30,        
-        defaultFontSize: 44,
-        lineHeightRatio: 1.4, 
-        fontFamily: 'Arial, sans-serif' 
+    // Cấu hình tỷ lệ % hình học của tấm bảng so với tổng thể bức ảnh
+    const BOARD_PERCENT_CONFIG = {
+        baseImageSrc: 'base.png',
+        xRatio: 0.215,       // Tương đương 21.5% từ lề trái vào
+        yRatio: 0.353,       // Tương đương 35.3% từ lề trên xuống
+        widthRatio: 0.605,   // Tương đương 60.5% chiều rộng ảnh
+        heightRatio: 0.206,  // Tương đương 20.6% chiều cao ảnh
+        paddingRatio: 0.04,  // Lề an toàn bên trong bảng
+        fontRatio: 0.03,     // Cỡ chữ mặc định bằng 3% chiều cao ảnh
+        fontFamily: 'Arial, sans-serif'
     };
 
     const canvas = document.getElementById('mainCanvas');
@@ -35,18 +34,35 @@ window.addEventListener('DOMContentLoaded', () => {
         const baseImage = new Image();
 
         baseImage.onload = () => {
-            // Lấy độ phân giải thật của ảnh gốc (1000x1500) chứ không lấy kích thước hiển thị của màn hình
-            const imgWidth = baseImage.naturalWidth || baseImage.width;
-            const imgHeight = baseImage.naturalHeight || baseImage.height;
+            // Lấy kích thước thực tế mà trình duyệt cấp cho ảnh
+            const w = baseImage.width;
+            const h = baseImage.height;
 
-            canvas.width = imgWidth;
-            canvas.height = imgHeight;
+            if (w === 0 || h === 0) {
+                showError("Trình duyệt chưa đọc được kích thước ảnh.");
+                return;
+            }
 
-            // Vẽ ảnh gốc lên canvas
-            ctx.drawImage(baseImage, 0, 0, imgWidth, imgHeight);
+            canvas.width = w;
+            canvas.height = h;
+
+            // Vẽ ảnh gốc
+            ctx.drawImage(baseImage, 0, 0, w, h);
             
-            // Tiến hành vẽ chữ
-            renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
+            // Tính toán tọa độ pixel động dựa trên tỷ lệ %
+            const dynamicConfig = {
+                targetX: w * BOARD_PERCENT_CONFIG.xRatio,
+                targetY: h * BOARD_PERCENT_CONFIG.yRatio,
+                targetWidth: w * BOARD_PERCENT_CONFIG.widthRatio,
+                targetHeight: h * BOARD_PERCENT_CONFIG.heightRatio,
+                padding: w * BOARD_PERCENT_CONFIG.paddingRatio,
+                defaultFontSize: h * BOARD_PERCENT_CONFIG.fontRatio,
+                lineHeightRatio: 1.4,
+                fontFamily: BOARD_PERCENT_CONFIG.fontFamily
+            };
+
+            // Vẽ chữ đè lên bảng bằng tọa độ động vừa tính
+            renderTextOnBoard(ctx, textToRender, dynamicConfig);
 
             // Xuất ảnh kết quả
             const dataUrl = canvas.toDataURL('image/png', 1.0);
@@ -59,8 +75,7 @@ window.addEventListener('DOMContentLoaded', () => {
             showError(`Không thể tải file ảnh nguồn.`);
         };
 
-        // Phá cache ảnh
-        baseImage.src = BOARD_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
+        baseImage.src = BOARD_PERCENT_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
 
     } catch (globalError) {
         showError("Lỗi hệ thống: " + globalError.message);
@@ -76,7 +91,7 @@ function renderTextOnBoard(ctx, text, config) {
     let totalHeight = 0;
 
     // Thuật toán tự động xuống dòng và co chữ
-    while (currentFontSize > 14) {
+    while (currentFontSize > 12) {
         ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
         lines = [];
         const rawLines = text.split('\n');
@@ -110,19 +125,18 @@ function renderTextOnBoard(ctx, text, config) {
         totalHeight = lines.length * currentFontSize * config.lineHeightRatio;
 
         if (totalHeight > maxHeight) {
-            currentFontSize -= 2; 
+            currentFontSize -= 1; 
         } else {
             break; 
         }
     }
 
-    // Thiết lập vẽ phẳng tĩnh an toàn tuyệt đối
+    // Tiến hành vẽ chữ phẳng
     ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top'; 
     ctx.fillStyle = '#1c1c1e'; 
 
-    // Tính toán vị trí Y chính giữa bảng
     const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2;
     const centerX = config.targetX + (config.targetWidth / 2);
 
