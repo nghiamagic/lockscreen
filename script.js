@@ -3,13 +3,13 @@
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Bộ tọa độ phẳng chuẩn xác theo pixel gốc của base.png
+    // Bộ tọa độ chuẩn xác theo pixel gốc của tấm bảng trắng
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
         targetX: 215,       // Tọa độ lề trái vùng trắng
-        targetY: 530,       // Tọa độ lề trên vùng trắng
+        targetY: 520,       // Tọa độ lề trên vùng trắng
         targetWidth: 605,   // Chiều rộng vùng trắng
-        targetHeight: 300,  // Chiều cao vùng trắng
+        targetHeight: 310,  // Chiều cao vùng trắng
         padding: 30,        // Khoảng cách an toàn từ viền bảng
         defaultFontSize: 44,// Kích thước chữ tối đa
         lineHeightRatio: 1.4, 
@@ -29,23 +29,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
     try {
         const urlParams = new URLSearchParams(window.location.search);
-        let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nĐã tích hợp thành công!\nSẵn sàng render nội dung tùy chỉnh.";
+        let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nĐã tích hợp thành công!";
         textToRender = textToRender.replace(/\\n/g, '\n');
 
         const baseImage = new Image();
 
         baseImage.onload = () => {
-            // Thiết lập chuẩn kích thước Canvas trùng khớp 100% kích thước ảnh gốc
-            canvas.width = baseImage.width;
-            canvas.height = baseImage.height;
+            // ÉP CANVAS LẤY ĐÚNG KÍCH THƯỚC GỐC CỦA FILE ẢNH (QUAN TRỌNG NHẤT)
+            const imgWidth = baseImage.naturalWidth || baseImage.width;
+            const imgHeight = baseImage.naturalHeight || baseImage.height;
 
-            // Vẽ ảnh gốc lên trước
-            ctx.drawImage(baseImage, 0, 0);
+            canvas.width = imgWidth;
+            canvas.height = imgHeight;
+
+            // Vẽ ảnh gốc
+            ctx.drawImage(baseImage, 0, 0, imgWidth, imgHeight);
             
-            // Tiến hành vẽ chữ đè lên bảng
+            // Vẽ chữ đè lên bảng
             renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
 
-            // Xuất ảnh
+            // Xuất ảnh chất lượng cao
             const dataUrl = canvas.toDataURL('image/png', 1.0);
             resultImage.src = dataUrl;
             resultImage.style.display = 'block';
@@ -56,6 +59,7 @@ window.addEventListener('DOMContentLoaded', () => {
             showError(`Không thể tải file "${BOARD_CONFIG.baseImageSrc}".`);
         };
 
+        // Thêm timestamp để ép trình duyệt xóa cache ảnh cũ
         baseImage.src = BOARD_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
 
     } catch (globalError) {
@@ -115,15 +119,14 @@ function renderTextOnBoard(ctx, text, config) {
     // Thiết lập thuộc tính vẽ chữ phẳng an toàn
     ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top'; // Sử dụng góc trên để tính toán chính xác dòng chữ
+    ctx.textBaseline = 'top'; 
     ctx.fillStyle = '#222224'; 
 
-    // Căn giữa khối chữ theo chiều dọc của vùng trắng
+    // Tính toán tọa độ Y bắt đầu dựa trên tổng chiều cao khối chữ để căn giữa bảng
     const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2;
-    // Điểm chính giữa theo chiều ngang của bảng
     const centerX = config.targetX + (config.targetWidth / 2);
 
-    // Tiến hành vẽ chữ tuần tự từng dòng từ trên xuống dưới
+    // Tiến hành vẽ chữ tuần tự từng dòng
     for (let k = 0; k < lines.length; k++) {
         const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
         ctx.fillText(lines[k], centerX, lineY);
