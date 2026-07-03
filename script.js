@@ -1,18 +1,19 @@
 /**
- * Lockscreen Prediction System (LPS) - Bộ Engine Tính Toán Chuẩn Tỷ Lệ %
+ * Lockscreen Prediction System (LPS) - Bộ Engine Tweak Tọa Độ Trực Quan
  */
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Cấu hình tỷ lệ % hình học của tấm bảng so với tổng thể bức ảnh base.png
-    const BOARD_PERCENT_CONFIG = {
-        baseImageSrc: 'base.png',
-        xRatio: 0.215,       // 21.5% từ lề trái vào
-        yRatio: 0.353,       // 35.3% từ lề trên xuống
-        widthRatio: 0.605,   // 60.5% chiều rộng ảnh
-        heightRatio: 0.206,  // 20.6% chiều cao ảnh
-        paddingRatio: 0.04,  // Lề an toàn bên trong bảng
-        fontRatio: 0.038,    // Cỡ chữ tối đa ban đầu
-        fontFamily: 'Arial, sans-serif'
+    // Cấu hình tọa độ ban đầu (Sẽ được thay đổi trực tiếp bằng thanh kéo phía dưới)
+    let BOARD_CONFIG = {
+        baseImageSrc: 'base.png', 
+        targetX: 215,       
+        targetY: 530,       // Đang bị cao, tí nữa bạn kéo thanh Y tăng lên khoảng 750-800 chữ sẽ xuống bảng
+        targetWidth: 605,   
+        targetHeight: 300,  
+        padding: 30,        
+        defaultFontSize: 44,
+        lineHeightRatio: 1.4, 
+        fontFamily: 'Arial, sans-serif' 
     };
 
     const canvas = document.getElementById('mainCanvas');
@@ -20,66 +21,59 @@ window.addEventListener('DOMContentLoaded', () => {
     const resultImage = document.getElementById('resultImage');
     const loadingDiv = document.getElementById('loading');
 
-    function showError(message) {
-        if (loadingDiv) {
-            loadingDiv.innerHTML = `<span style="color: #ff4d4d; font-weight: bold;">LỖI:</span> ${message}`;
-        }
-    }
+    // Tự động tạo Bộ điều khiển thủ công đè lên giao diện để bạn căn chỉnh
+    const controlPanel = document.createElement('div');
+    controlPanel.style = "position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#fff;padding:15px;font-family:monospace;z-index:9999;max-height:40vh;overflow-y:auto;font-size:13px;line-height:1.6;";
+    controlPanel.innerHTML = `
+        <div style="font-weight:bold;color:#4af;margin-bottom:10px;">🛠️ BỘ CĂN CHỈNH TỌA ĐỘ CHỮ TRỰC TIẾP:</div>
+        <div>Tọa độ X: <input type="range" id="sliderX" min="0" max="1200" value="${BOARD_CONFIG.targetX}" style="width:70%"> <span id="valX">${BOARD_CONFIG.targetX}</span></div>
+        <div>Tọa độ Y (Đẩy chữ lên/xuống): <input type="range" id="sliderY" min="0" max="1500" value="${BOARD_CONFIG.targetY}" style="width:70%"> <span id="valY">${BOARD_CONFIG.targetY}</span></div>
+        <div>Chiều RỘNG vùng chữ: <input type="range" id="sliderW" min="50" max="1000" value="${BOARD_CONFIG.targetWidth}" style="width:70%"> <span id="valW">${BOARD_CONFIG.targetWidth}</span></div>
+        <div>Chiều CAO vùng chữ: <input type="range" id="sliderH" min="50" max="800" value="${BOARD_CONFIG.targetHeight}" style="width:70%"> <span id="valH">${BOARD_CONFIG.targetHeight}</span></div>
+        <div>Cỡ chữ tối đa: <input type="range" id="sliderFS" min="10" max="100" value="${BOARD_CONFIG.defaultFontSize}" style="width:70%"> <span id="valFS">${BOARD_CONFIG.defaultFontSize}</span></div>
+        <hr style="border-color:#444">
+        <div style="color:#0f0;">👉 CODE TỌA ĐỘ ĐỂ COPY:</div>
+        <textarea id="codeOutput" style="width:100%;height:50px;background:#222;color:#fff;border:1px solid #444;font-size:11px;" readonly></textarea>
+    `;
+    document.body.appendChild(controlPanel);
 
-    try {
+    const baseImage = new Image();
+
+    function updateRender() {
+        const w = baseImage.naturalWidth || baseImage.width;
+        const h = baseImage.naturalHeight || baseImage.height;
+        if (w === 0 || h === 0) return;
+
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(baseImage, 0, 0, w, h);
+
         const urlParams = new URLSearchParams(window.location.search);
         let textToRender = urlParams.get('text') || "DỰ ÁN LOCKSCREEN:\nĐã tích hợp thành công!";
         textToRender = textToRender.replace(/\\n/g, '\n');
 
-        const baseImage = new Image();
+        renderTextOnBoard(ctx, textToRender, BOARD_CONFIG);
 
-        baseImage.onload = () => {
-            // Lấy kích thước thực tế của ảnh
-            const w = baseImage.naturalWidth || baseImage.width;
-            const h = baseImage.naturalHeight || baseImage.height;
+        resultImage.src = canvas.toDataURL('image/png', 1.0);
+        resultImage.style.display = 'block';
+        if (loadingDiv) loadingDiv.style.display = 'none';
 
-            if (w === 0 || h === 0) {
-                showError("Trình duyệt chưa đọc được kích thước ảnh nguồn.");
-                return;
-            }
-
-            canvas.width = w;
-            canvas.height = h;
-
-            // Vẽ ảnh gốc lên trước
-            ctx.drawImage(baseImage, 0, 0, w, h);
-            
-            // Tính toán tọa độ pixel động dựa trên tỷ lệ %
-            const dynamicConfig = {
-                targetX: w * BOARD_PERCENT_CONFIG.xRatio,
-                targetY: h * BOARD_PERCENT_CONFIG.yRatio,
-                targetWidth: w * BOARD_PERCENT_CONFIG.widthRatio,
-                targetHeight: h * BOARD_PERCENT_CONFIG.heightRatio,
-                padding: w * BOARD_PERCENT_CONFIG.paddingRatio,
-                defaultFontSize: h * BOARD_PERCENT_CONFIG.fontRatio,
-                lineHeightRatio: 1.4,
-                fontFamily: BOARD_PERCENT_CONFIG.fontFamily
-            };
-
-            // Vẽ chữ lên bảng bằng cấu hình động vừa tính
-            renderTextOnBoard(ctx, textToRender, dynamicConfig);
-
-            // Xuất ảnh kết quả dạng PNG chất lượng cao
-            const dataUrl = canvas.toDataURL('image/png', 1.0);
-            resultImage.src = dataUrl;
-            resultImage.style.display = 'block';
-            if (loadingDiv) loadingDiv.style.display = 'none';
-        };
-
-        baseImage.onerror = () => {
-            showError(`Không thể tải file ảnh nguồn base.png.`);
-        };
-
-        baseImage.src = BOARD_PERCENT_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
-
-    } catch (globalError) {
-        showError("Lỗi hệ thống: " + globalError.message);
+        // Xuất đoạn code chuẩn để bạn copy sau khi chỉnh xong
+        document.getElementById('codeOutput').value = `targetX: ${BOARD_CONFIG.targetX}, targetY: ${BOARD_CONFIG.targetY}, targetWidth: ${BOARD_CONFIG.targetWidth}, targetHeight: ${BOARD_CONFIG.targetHeight}, defaultFontSize: ${BOARD_CONFIG.defaultFontSize}`;
     }
+
+    baseImage.onload = () => {
+        updateRender();
+
+        // Lắng nghe sự kiện thay đổi của các thanh kéo để lập tức vẽ lại chữ tại chỗ
+        document.getElementById('sliderX').addEventListener('input', (e) => { BOARD_CONFIG.targetX = parseInt(e.target.value); document.getElementById('valX').innerText = e.target.value; updateRender(); });
+        document.getElementById('sliderY').addEventListener('input', (e) => { BOARD_CONFIG.targetY = parseInt(e.target.value); document.getElementById('valY').innerText = e.target.value; updateRender(); });
+        document.getElementById('sliderW').addEventListener('input', (e) => { BOARD_CONFIG.targetWidth = parseInt(e.target.value); document.getElementById('valW').innerText = e.target.value; updateRender(); });
+        document.getElementById('sliderH').addEventListener('input', (e) => { BOARD_CONFIG.targetHeight = parseInt(e.target.value); document.getElementById('valH').innerText = e.target.value; updateRender(); });
+        document.getElementById('sliderFS').addEventListener('input', (e) => { BOARD_CONFIG.defaultFontSize = parseInt(e.target.value); document.getElementById('valFS').innerText = e.target.value; updateRender(); });
+    };
+
+    baseImage.src = BOARD_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
 });
 
 function renderTextOnBoard(ctx, text, config) {
@@ -90,7 +84,6 @@ function renderTextOnBoard(ctx, text, config) {
     let lines = [];
     let totalHeight = 0;
 
-    // Thuật toán tự động xuống dòng và co chữ cho vừa vặn
     while (currentFontSize > 12) {
         ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
         lines = [];
@@ -131,17 +124,14 @@ function renderTextOnBoard(ctx, text, config) {
         }
     }
 
-    // Thiết lập vẽ chữ phẳng chính xác
     ctx.font = `bold ${currentFontSize}px ${config.fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top'; 
-    ctx.fillStyle = '#1c1c1e'; // Màu đen mực bút viết bảng tự nhiên
+    ctx.fillStyle = '#1c1c1e'; 
 
-    // Căn giữa khối chữ theo chiều dọc và ngang của vùng trắng
     const startY = config.targetY + config.padding + (maxHeight - totalHeight) / 2;
     const centerX = config.targetX + (config.targetWidth / 2);
 
-    // Tiến hành vẽ chữ
     for (let k = 0; k < lines.length; k++) {
         const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
         ctx.fillText(lines[k], centerX, lineY);
