@@ -6,11 +6,11 @@ window.addEventListener('DOMContentLoaded', () => {
     // Cấu hình tọa độ bảng mới ôm trọn vùng trắng trong image_048c71.jpg
     const BOARD_CONFIG = {
         baseImageSrc: 'base.png', 
-        targetX: 180,       
-        targetY: 220,       
-        targetWidth: 640,   
-        targetHeight: 580,  
-        padding: 40,        
+        targetX: 231,       
+        targetY: 770,       
+        targetWidth: 605,   
+        targetHeight: 300,  
+        padding: 30,        
         defaultFontSize: 110, // Tăng cỡ chữ đại bản giống mẫu
         lineHeightRatio: 1.15,
         fontFamily: '"Permanent Marker", Arial, sans-serif'
