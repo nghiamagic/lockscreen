@@ -1,47 +1,44 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lockscreen Prediction Engine</title>
-    <!-- Nhúng Font Permanent Marker chuẩn giống ảnh mẫu -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #111;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-        }
-        #resultImage {
-            max-width: 100%;
-            max-height: 100vh;
-            object-fit: contain;
-            display: none;
-        }
-        #loading {
-            position: fixed;
-            color: #ffffff;
-            font-size: 16px;
-        }
-        canvas {
-            display: none !important;
-        }
-    </style>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width,initial-scale=1.0">
+
+<title>LPS Brush Engine</title>
+
+<link
+rel="stylesheet"
+href="style.css">
+
+<link
+href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap"
+rel="stylesheet">
+
 </head>
+
 <body>
 
-    <div id="loading">Đang khởi tạo font Permanent Marker và hiệu ứng cọ xước...</div>
-    <img id="resultImage" alt="Lockscreen Result" />
-    <canvas id="mainCanvas"></canvas>
+<div id="loading">
+Đang tạo ảnh...
+</div>
 
-    <script src="script.js?v=permanent_marker_v1"></script>
+<canvas
+id="canvas">
+</canvas>
+
+<img
+id="result"
+alt="result">
+
+<script src="brush.js"></script>
+
+<script src="script.js"></script>
+
 </body>
+
 </html>
