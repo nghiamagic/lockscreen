@@ -1,1055 +1,505 @@
-/**
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-Lockscreen Prediction System (LPS) - Permanent Marker & Brush Custom Engine*/
+const SIZE = 1400;
 
-window.addEventListener('DOMContentLoaded', () => {// Cấu hình tọa độ bảng mới ôm trọn vùng trắng trong image_048c71.jpgconst BOARD_CONFIG = {baseImageSrc: 'base.png',targetX: 231,targetY: 770,targetWidth: 605,targetHeight: 300,padding: 30,defaultFontSize: 110, // Tăng cỡ chữ đại bản giống mẫulineHeightRatio: 1.15,fontFamily: '"Permanent Marker", Arial, sans-serif'};
+canvas.width = SIZE;
+canvas.height = SIZE;
 
-const canvas = document.getElementById('mainCanvas');
-const ctx = canvas.getContext('2d');
-const resultImage = document.getElementById('resultImage');
-const loadingDiv = document.getElementById('loading');
+const input = document.getElementById("text");
+const btn = document.getElementById("render");
 
-try {
-    const urlParams = new URLSearchParams(window.location.search);
-    let textToRender = urlParams.get('text') || "PHẠM\nQUỐC\nNGHĨA";
-    textToRender = textToRender.replace(/\\n/g, '\n');
+const config = {
 
-    const baseImage = new Image();
+    padding:120,
 
-    baseImage.onload = () => {
-        // Chờ font load hẳn trong 400ms để không bị lỗi rụng font trên iPhone
-        setTimeout(() => {
-            const w = baseImage.naturalWidth || baseImage.width;
-            const h = baseImage.naturalHeight || baseImage.height;
+    maxFont:260,
 
-            canvas.width = w;
-            canvas.height = h;
+    minFont:80,
 
-            // Vẽ ảnh nền gốc
-            ctx.drawImage(baseImage, 0, 0, w, h);
-            
-            // Khởi chạy thuật toán xử lý cọ nhám Permanent Marker
-            renderPermanentMarkerText(ctx, textToRender, BOARD_CONFIG);
+    lineHeight:0.86,
 
-            const dataUrl = canvas.toDataURL('image/png', 1.0);
-            resultImage.src = dataUrl;
-            resultImage.style.display = 'block';
-            if (loadingDiv) loadingDiv.style.display = 'none';
-        }, 400);
-    };
+    fontFamily:
+        '"Arial Black","Impact",sans-serif',
 
-    baseImage.onerror = () => {
-        if (loadingDiv) loadingDiv.innerHTML = "Lỗi: Không tìm thấy file base.png mới.";
-    };
+    fill:"#000000",
 
-    baseImage.src = BOARD_CONFIG.baseImageSrc + '?v=' + new Date().getTime();
+    background:"#ffffff"
 
-} catch (err) {
-    if (loadingDiv) loadingDiv.innerHTML = "Lỗi engine: " + err.message;
+};
+
+function clearCanvas(){
+
+    ctx.fillStyle = config.background;
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
 }
 
-});
+function splitLines(text){
 
-function renderPermanentMarkerText(ctx, text, config) {
+    return text
+        .replace(/\r/g,"")
+        .split("\n")
+        .map(v=>v.trim())
+        .filter(v=>v.length);
 
-const maxWidth = config.targetWidth - config.padding * 2;const maxHeight = config.targetHeight - config.padding * 2;
+}
 
-let fontSize = config.defaultFontSize;let lines = [];let totalHeight = 0;
+function fitFont(lines){
 
-/==============================AUTO FIT (GIỮ NGUYÊN)==============================/
+    let size=config.maxFont;
 
-while (fontSize > 30) {
+    while(size>=config.minFont){
 
-ctx.font = `${fontSize}px ${config.fontFamily}`;
+        ctx.font=`900 ${size}px ${config.fontFamily}`;
 
-lines = [];
+        let ok=true;
 
-for (const raw of text.split("\n")) {
+        for(const line of lines){
 
-    const words = raw.split(" ");
+            const w=ctx.measureText(line).width;
 
-    let line = "";
+            if(
+                w>
+                canvas.width-config.padding*2
+            ){
 
-    for (const word of words) {
+                ok=false;
+                break;
 
-        const test =
-            line
-                ? line + " " + word
-                : word;
+            }
 
-        if (ctx.measureText(test).width > maxWidth) {
+        }
 
-            if (line)
-                lines.push(line);
+        if(ok)
+            return size;
 
-            line = word;
+        size-=4;
 
-        } else {
+    }
 
-            line = test;
+    return config.minFont;
+
+}
+
+function getStartY(count,fontSize){
+
+    const totalHeight=
+        count*
+        fontSize*
+        config.lineHeight;
+
+    return (
+        canvas.height-totalHeight
+    )/2+fontSize*0.8;
+
+}
+
+function prepare(){
+
+    clearCanvas();
+
+    ctx.textAlign="center";
+    ctx.textBaseline="alphabetic";
+    ctx.lineJoin="round";
+    ctx.lineCap="round";
+    ctx.imageSmoothingEnabled=true;
+
+}
+// =====================================================
+// BRUSH ENGINE
+// =====================================================
+
+function rand(a, b) {
+    return a + Math.random() * (b - a);
+}
+
+function drawBrushStroke(text, x, y, size) {
+
+    ctx.save();
+
+    ctx.font = `900 ${size}px ${config.fontFamily}`;
+    ctx.fillStyle = config.fill;
+    ctx.strokeStyle = config.fill;
+
+    // ---------- Lớp ruột ----------
+    ctx.globalAlpha = 1;
+    ctx.fillText(text, x, y);
+
+    // ---------- Viền dày ----------
+    ctx.lineWidth = size * 0.03;
+
+    for (let i = 0; i < 12; i++) {
+
+        ctx.globalAlpha = 0.22;
+
+        ctx.strokeText(
+            text,
+            x + rand(-1.5, 1.5),
+            y + rand(-1.5, 1.5)
+        );
+
+    }
+
+    // ---------- Brush ----------
+    for (let i = 0; i < 280; i++) {
+
+        ctx.globalAlpha = rand(0.015, 0.05);
+
+        ctx.lineWidth = rand(
+            size * 0.01,
+            size * 0.035
+        );
+
+        ctx.strokeText(
+            text,
+            x + rand(-4, 4),
+            y + rand(-4, 4)
+        );
+
+    }
+
+    // ---------- Heavy Brush ----------
+    for (let i = 0; i < 140; i++) {
+
+        ctx.globalAlpha = rand(0.03, 0.08);
+
+        ctx.lineWidth = rand(
+            size * 0.02,
+            size * 0.05
+        );
+
+        ctx.strokeText(
+            text,
+            x + rand(-7, 7),
+            y + rand(-7, 7)
+        );
+
+    }
+
+    ctx.restore();
+
+}
+function renderBaseText() {
+
+    prepare();
+
+    const lines = splitLines(input.value);
+
+    const fontSize = fitFont(lines);
+
+    const startY = getStartY(
+        lines.length,
+        fontSize
+    );
+
+    for (let i = 0; i < lines.length; i++) {
+
+        drawBrushStroke(
+
+            lines[i],
+
+            canvas.width / 2,
+
+            startY +
+                i *
+                fontSize *
+                config.lineHeight,
+
+            fontSize
+
+        );
+
+    }
+
+    applyTexture();
+
+    roughEdge();
+
+    addHeavyInk();
+
+    sharpenImage();
+
+}
+
+// =====================================================
+// TEXTURE ENGINE
+// =====================================================
+
+function addDryBrushTexture(){
+
+    const img = ctx.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    const d = img.data;
+
+    for(let y=0;y<canvas.height;y++){
+
+        for(let x=0;x<canvas.width;x++){
+
+            const i=(y*canvas.width+x)*4;
+
+            if(d[i+3]<5) continue;
+
+            // Xác suất tạo lỗ trắng
+            if(Math.random()<0.028){
+
+                d[i+3]=0;
+                continue;
+
+            }
+
+            // Làm nhám cạnh
+            const n=(Math.random()-0.5)*36;
+
+            d[i]+=n;
+            d[i+1]+=n;
+            d[i+2]+=n;
 
         }
 
     }
 
-    if (line)
-        lines.push(line);
+    ctx.putImageData(img,0,0);
 
 }
 
-totalHeight =
-    lines.length *
-    fontSize *
-    config.lineHeightRatio;
-
-if (totalHeight <= maxHeight)
-    break;
-
-fontSize -= 2;
-
-}
-
-/==============================ROTATE (GIỮ NGUYÊN)==============================/
-
-const centerX =config.targetX +config.targetWidth / 2;
-
-const centerY =config.targetY +config.targetHeight / 2;
-
-ctx.save();
-
-ctx.translate(centerX, centerY);
-
-ctx.rotate(-1.2 * Math.PI / 180);
-
-/==============================CANVAS TẠM==============================/
-
-const scratch =document.createElement("canvas");
-
-scratch.width =config.targetWidth + 120;
-
-scratch.height =config.targetHeight + 120;
-
-const sCtx =scratch.getContext("2d");
-
-sCtx.textAlign = "center";sCtx.textBaseline = "middle";sCtx.lineJoin = "round";sCtx.lineCap = "round";
-
-sCtx.font =`${fontSize}px ${config.fontFamily}`;
-
-const g =sCtx.createLinearGradient(0,0,0,scratch.height);
-
-g.addColorStop(0,"#111");g.addColorStop(.6,"#1a1a1c");g.addColorStop(1,"#2d2d31");
-
-sCtx.fillStyle = g;sCtx.strokeStyle = g;
-
-/==============================VẼ CHỮ GIỐNG BÚT LÔNG==============================/
-
-const startY =
-
-scratch.height/2-
-
-totalHeight/2+
-
-fontSize*config.lineHeightRatio/2;
-
-const cx =scratch.width/2;
-
-for(let i=0;i<lines.length;i++){
-
-drawMarkerStroke(
-
-sCtx,
-
-lines[i].toUpperCase(),
-
-cx,
-
-startY+
-
-i*
-
-fontSize*
-
-config.lineHeightRatio,
-
-fontSize
-
-);
-
-}
-
-/==============================HIỆU ỨNG MỰC==============================/
-
-applyInkTexture(scratch);
-
-applyDryMarker(scratch);
-
-applyFiberNoise(scratch);
-
-applyEdgeRoughness(scratch);
-
-
-
-/* ==========================================================================Permanent Marker BrushDán NGAY BÊN DƯỚI renderPermanentMarkerText()========================================================================== */
-
-/* ==========================================================================PATCH V1THAY THẾ TOÀN BỘ drawMarkerStroke()========================================================================== */
-
-function drawMarkerStroke(ctx, text, x, y, fontSize) {
-
-const PASS = 10;
-
-for (let i = 0; i < PASS; i++) {
-
-    const pressure =
-        0.86 + Math.random() * 0.14;
-
-    const ox =
-        (Math.random() - 0.5) *
-        (fontSize * 0.014);
-
-    const oy =
-        (Math.random() - 0.5) *
-        (fontSize * 0.014);
+function addInkNoise(){
 
     ctx.save();
 
-    ctx.globalAlpha =
-        0.10 +
-        Math.random() * 0.05;
+    ctx.fillStyle="#000";
 
-    ctx.lineWidth =
-        fontSize *
-        (0.048 + Math.random() * 0.008) *
-        pressure;
+    for(let i=0;i<70000;i++){
 
-    ctx.strokeText(
-        text,
-        x + ox,
-        y + oy
-    );
+        ctx.globalAlpha=Math.random()*0.03;
 
-    ctx.fillText(
-        text,
-        x + ox,
-        y + oy
-    );
+        ctx.fillRect(
+
+            Math.random()*canvas.width,
+
+            Math.random()*canvas.height,
+
+            1+Math.random()*2,
+
+            1+Math.random()*2
+
+        );
+
+    }
 
     ctx.restore();
 
 }
 
-/* =============================
-   Đầu bút hơi khô
-============================== */
+function addBrushScratches(){
 
-ctx.save();
+    ctx.save();
 
-ctx.globalCompositeOperation =
-    "destination-out";
+    ctx.strokeStyle="#000";
 
-ctx.globalAlpha = 0.08;
+    for(let i=0;i<3500;i++){
 
-for (let i = 0; i < fontSize * 1.2; i++) {
+        ctx.globalAlpha=Math.random()*0.05;
 
-    const rx =
-        x +
-        (Math.random() - .5) *
-        fontSize * 2.5;
+        ctx.lineWidth=Math.random()*2;
 
-    const ry =
-        y +
-        (Math.random() - .5) *
-        fontSize * .65;
+        const x=Math.random()*canvas.width;
+        const y=Math.random()*canvas.height;
 
-    const r =
-        .35 +
-        Math.random() * .6;
+        const len=5+Math.random()*20;
 
-    ctx.beginPath();
+        const a=Math.random()*Math.PI;
 
-    ctx.arc(
-        rx,
-        ry,
-        r,
+        ctx.beginPath();
+
+        ctx.moveTo(x,y);
+
+        ctx.lineTo(
+
+            x+Math.cos(a)*len,
+
+            y+Math.sin(a)*len
+
+        );
+
+        ctx.stroke();
+
+    }
+
+    ctx.restore();
+
+}
+
+function addInkBreak(){
+
+    ctx.save();
+
+    ctx.globalCompositeOperation="destination-out";
+
+    for(let i=0;i<22000;i++){
+
+        ctx.globalAlpha=Math.random()*0.12;
+
+        ctx.beginPath();
+
+        ctx.arc(
+
+            Math.random()*canvas.width,
+
+            Math.random()*canvas.height,
+
+            Math.random()*2.4,
+
+            0,
+
+            Math.PI*2
+
+        );
+
+        ctx.fill();
+
+    }
+
+    ctx.restore();
+
+}
+
+function applyTexture(){
+
+    addDryBrushTexture();
+
+    addInkNoise();
+
+    addBrushScratches();
+
+    addInkBreak();
+
+}
+// ======================================================
+// EDGE ENGINE
+// ======================================================
+
+function roughEdge() {
+
+    ctx.save();
+
+    ctx.strokeStyle = "#000";
+
+    for (let i = 0; i < 1200; i++) {
+
+        ctx.globalAlpha = Math.random() * 0.05;
+
+        ctx.lineWidth = 0.5 + Math.random() * 3;
+
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            y
+        );
+
+        ctx.lineTo(
+            x + (Math.random() - 0.5) * 12,
+            y + (Math.random() - 0.5) * 12
+        );
+
+        ctx.stroke();
+
+    }
+
+    ctx.restore();
+
+}
+
+function addHeavyInk() {
+
+    ctx.save();
+
+    ctx.fillStyle = "#000";
+
+    for (let i = 0; i < 9000; i++) {
+
+        ctx.globalAlpha = Math.random() * 0.025;
+
+        ctx.beginPath();
+
+        ctx.arc(
+
+            Math.random() * canvas.width,
+
+            Math.random() * canvas.height,
+
+            Math.random() * 1.6,
+
+            0,
+
+            Math.PI * 2
+
+        );
+
+        ctx.fill();
+
+    }
+
+    ctx.restore();
+
+}
+
+function sharpenImage() {
+
+    const img = ctx.getImageData(
         0,
-        Math.PI * 2
+        0,
+        canvas.width,
+        canvas.height
     );
 
-    ctx.fill();
+    const d = img.data;
 
-}
+    for (let i = 0; i < d.length; i += 4) {
 
-ctx.restore();
-
-/* =============================
-   Lớp mực cuối
-============================== */
-
-ctx.save();
-
-ctx.globalAlpha = .18;
-
-ctx.lineWidth =
-    fontSize * .018;
-
-ctx.strokeText(
-    text,
-    x,
-    y
-);
-
-ctx.restore();
-
-}
-
-    /* ==========================================================================Ink TextureDán ngay dưới drawMarkerStroke()========================================================================== */
-
-function applyInkTexture(canvas) {
-
-const ctx = canvas.getContext("2d");
-
-const img = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-);
-
-const data = img.data;
-
-const w = canvas.width;
-const h = canvas.height;
-
-for (let y = 1; y < h - 1; y++) {
-
-    for (let x = 1; x < w - 1; x++) {
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (data[a] < 25)
+        if (d[i + 3] < 5)
             continue;
 
-        /* ==========================
-           Hạt mực loang
-        ========================== */
-
-        const grain =
-
-            0.82 +
-
-            Math.random() * 0.24;
-
-        data[a] *= grain;
-
-        /* ==========================
-           Mực tụ ở vùng đậm
-        ========================== */
-
-        const left =
-            data[a - 4];
-
-        const right =
-            data[a + 4];
-
-        const up =
-            data[a - w * 4];
-
-        const down =
-            data[a + w * 4];
-
-        const avg =
-
-            (left +
-             right +
-             up +
-             down) * .25;
-
-        if (avg > 180) {
-
-            data[a] =
-
-                Math.min(
-
-                    255,
-
-                    data[a] + 16
-
-                );
-
-        }
-
-        /* ==========================
-           Chỗ khô nhạt
-        ========================== */
-
-        if (Math.random() > .985) {
-
-            data[a] *=
-
-                .45 +
-
-                Math.random() * .2;
-
-        }
-
-        /* ==========================
-           Hạt mực sáng
-        ========================== */
-
-        if (Math.random() > .992) {
-
-            data[a] =
-
-                Math.min(
-
-                    255,
-
-                    data[a] + 24
-
-                );
-
-        }
+        d[i] = Math.min(255, d[i] * 1.12);
+        d[i + 1] = Math.min(255, d[i + 1] * 1.12);
+        d[i + 2] = Math.min(255, d[i + 2] * 1.12);
 
     }
 
-}
-
-/* =====================================
-   Loang nhẹ 8 hướng
-===================================== */
-
-const copy =
-    new Uint8ClampedArray(data);
-
-for (let y = 2; y < h - 2; y++) {
-
-    for (let x = 2; x < w - 2; x++) {
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (copy[a] < 170)
-            continue;
-
-        for (let yy = -1; yy <= 1; yy++) {
-
-            for (let xx = -1; xx <= 1; xx++) {
-
-                if (
-                    xx === 0 &&
-                    yy === 0
-                )
-                    continue;
-
-                const t =
-
-                    ((y + yy) * w +
-
-                     x + xx) * 4 + 3;
-
-                if (copy[t] < 70) {
-
-                    data[t] =
-
-                        Math.max(
-
-                            data[t],
-
-                            copy[a] * .18
-
-                        );
-
-                }
-
-            }
-
-        }
-
-    }
+    ctx.putImageData(img, 0, 0);
 
 }
 
-ctx.putImageData(
-    img,
-    0,
-    0
-);
+function exportPNG() {
 
-}/* ==========================================================================Dry Marker EffectDán ngay dưới applyInkTexture()========================================================================== */
+    const a = document.createElement("a");
 
-function applyDryMarker(canvas) {
+    a.download = "marker.png";
 
-const ctx = canvas.getContext("2d");
+    a.href = canvas.toDataURL("image/png");
 
-const img = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-);
-
-const data = img.data;
-
-const w = canvas.width;
-const h = canvas.height;
-
-/* ============================================================
-   Tạo các sọc trắng nhỏ dọc nét bút
-============================================================ */
-
-for (let x = 0; x < w; x++) {
-
-    if (Math.random() > 0.35)
-        continue;
-
-    let offset =
-        (Math.random() - .5) * 8;
-
-    for (let y = 0; y < h; y++) {
-
-        const xx =
-
-            Math.round(
-
-                x +
-
-                Math.sin(y * .045) *
-
-                1.8 +
-
-                offset
-
-            );
-
-        if (
-            xx < 1 ||
-            xx >= w - 1
-        )
-            continue;
-
-        const a =
-            (y * w + xx) * 4 + 3;
-
-        if (data[a] < 110)
-            continue;
-
-        data[a] *=
-
-            .45 +
-
-            Math.random() * .25;
-
-        if (Math.random() > .75) {
-
-            data[a - 4] *= .72;
-
-            data[a + 4] *= .72;
-
-        }
-
-    }
+    a.click();
 
 }
+document
+    .getElementById("save")
+    .onclick = exportPNG;
 
-/* ============================================================
-   Đầu bút khô
-============================================================ */
+btn.onclick = renderBaseText;
 
-/* ==========================================================================
-
-PATCH V1THAY THẾ PHẦN "Đầu bút khô" TRONG applyDryMarker()========================================================================== */
-
-for (let y = 2; y < h - 2; y++) {
-
-const fade =
-
-    Math.abs(
-        y - h / 2
-    ) /
-    (h / 2);
-
-for (let x = 2; x < w - 2; x++) {
-
-    const a =
-        (y * w + x) * 4 + 3;
-
-    if (data[a] < 120)
-        continue;
-
-    if (Math.random() < fade * .03) {
-
-        data[a] *=
-            .45 +
-            Math.random() * .25;
-
-        data[a - 4] *= .82;
-        data[a + 4] *= .82;
-        data[a - w * 4] *= .82;
-        data[a + w * 4] *= .82;
-
-    }
-
-}
-
-}
-
-/* ============================================================
-   Chấm khô li ti
-============================================================ */
-
-const dots =
-    Math.floor(w * h * 0.0035);
-
-for (let i = 0; i < dots; i++) {
-
-    const x =
-        (Math.random() * w) | 0;
-
-    const y =
-        (Math.random() * h) | 0;
-
-    const a =
-        (y * w + x) * 4 + 3;
-
-    if (data[a] < 90)
-        continue;
-
-    const r =
-        1 +
-        Math.random() * 1.2;
-
-    for (let yy = -2; yy <= 2; yy++) {
-
-        for (let xx = -2; xx <= 2; xx++) {
-
-            if (
-                xx * xx + yy * yy >
-                r * r
-            )
-                continue;
-
-            const px = x + xx;
-            const py = y + yy;
-
-            if (
-                px < 0 ||
-                py < 0 ||
-                px >= w ||
-                py >= h
-            )
-                continue;
-
-            const t =
-                (py * w + px) * 4 + 3;
-
-            data[t] *=
-
-                .25 +
-
-                Math.random() * .45;
-
-        }
-
-    }
-
-}
-
-/* ============================================================
-   Vệt nhấc bút
-============================================================ */
-
-for (let y = 0; y < h; y++) {
-
-    if (Math.random() > .985) {
-
-        const start =
-            (Math.random() * w * .7) | 0;
-
-        const len =
-            15 +
-            (Math.random() * 40) | 0;
-
-        for (let x = start; x < start + len; x++) {
-
-            if (
-                x < 0 ||
-                x >= w
-            )
-                continue;
-
-            const a =
-                (y * w + x) * 4 + 3;
-
-            if (data[a] > 80) {
-
-                data[a] *=
-
-                    .55 +
-
-                    Math.random() * .2;
-
-            }
-
-        }
-
-    }
-
-}
-
-ctx.putImageData(
-    img,
-    0,
-    0
-);
-
-}/* ==========================================================================Fiber NoiseDán ngay dưới applyDryMarker()========================================================================== */
-
-function applyFiberNoise(canvas) {
-
-const ctx = canvas.getContext("2d");
-
-const img = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-);
-
-const data = img.data;
-
-const w = canvas.width;
-const h = canvas.height;
-
-/* ==========================================================
-   Các sợi mực nhỏ bên trong nét
-========================================================== */
-
-const fibers =
-    Math.floor(w * h * 0.010);
-
-for (let i = 0; i < fibers; i++) {
-
-    let x =
-        (Math.random() * w) | 0;
-
-    let y =
-        (Math.random() * h) | 0;
-
-    const len =
-        3 +
-        ((Math.random() * 8) | 0);
-
-    let dx =
-        (Math.random() - .5) * .8;
-
-    let dy =
-        1 + Math.random();
-
-    for (let k = 0; k < len; k++) {
-
-        if (
-            x < 1 ||
-            y < 1 ||
-            x >= w - 1 ||
-            y >= h - 1
-        ) break;
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (data[a] > 90) {
-
-            data[a] *=
-                .60 +
-                Math.random() * .25;
-
-            if (Math.random() > .55) {
-
-                data[a - 4] *= .85;
-                data[a + 4] *= .85;
-
-            }
-
-        }
-
-        x += dx + (Math.random() - .5);
-        y += dy;
-
-    }
-
-}
-
-/* ==========================================================
-   Sợi trắng rất nhỏ
-========================================================== */
-
-const whiteFibers =
-    Math.floor(w * h * 0.002);
-
-for (let i = 0; i < whiteFibers; i++) {
-
-    let x =
-        (Math.random() * w) | 0;
-
-    let y =
-        (Math.random() * h) | 0;
-
-    const len =
-        2 +
-        ((Math.random() * 6) | 0);
-
-    for (let j = 0; j < len; j++) {
-
-        if (
-            x < 1 ||
-            y < 1 ||
-            x >= w - 1 ||
-            y >= h - 1
-        ) break;
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (data[a] > 120) {
-
-            data[a] *=
-                .35 +
-                Math.random() * .25;
-
-        }
-
-        x +=
-            ((Math.random() * 3) | 0) - 1;
-
-        y++;
-
-    }
-
-}
-
-ctx.putImageData(
-    img,
-    0,
-    0
-);
-
-}/* ==========================================================================Edge RoughnessDán ngay dưới applyFiberNoise()========================================================================== */
-
-function applyEdgeRoughness(canvas) {
-
-const ctx = canvas.getContext("2d");
-
-const img = ctx.getImageData(
-    0,
-    0,
-    canvas.width,
-    canvas.height
-);
-
-const data = img.data;
-
-const w = canvas.width;
-const h = canvas.height;
-
-const copy =
-    new Uint8ClampedArray(data);
-
-/* ==========================================================
-   Làm nham viền chữ
-========================================================== */
-
-for (let y = 2; y < h - 2; y++) {
-
-    for (let x = 2; x < w - 2; x++) {
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (copy[a] < 60)
-            continue;
-
-        let edge = 0;
-
-        if (copy[a - 4] < 20) edge++;
-        if (copy[a + 4] < 20) edge++;
-        if (copy[a - w * 4] < 20) edge++;
-        if (copy[a + w * 4] < 20) edge++;
-
-        if (!edge)
-            continue;
-
-        /* =============================
-           Cắn viền
-        ============================= */
-
-        if (Math.random() < 0.45) {
-
-            data[a] *=
-                0.55 +
-                Math.random() * 0.35;
-
-        }
-
-        /* =============================
-           Kéo gai ra ngoài
-        ============================= */
-
-        if (Math.random() < 0.30) {
-
-            const nx =
-                x +
-                ((Math.random() * 5) | 0) - 2;
-
-            const ny =
-                y +
-                ((Math.random() * 5) | 0) - 2;
-
-            if (
-                nx >= 0 &&
-                ny >= 0 &&
-                nx < w &&
-                ny < h
-            ) {
-
-                const t =
-                    (ny * w + nx) * 4 + 3;
-
-                if (copy[t] < 20) {
-
-                    data[t] =
-                        copy[a] *
-                        (0.15 + Math.random() * 0.25);
-
-                }
-
-            }
-
-        }
-
-    }
-
-}
-
-/* ==========================================================
-   Hạt mực sát mép
-========================================================== */
-
-const grains =
-    Math.floor(w * h * 0.0025);
-
-for (let i = 0; i < grains; i++) {
-
-    const x =
-        (Math.random() * w) | 0;
-
-    const y =
-        (Math.random() * h) | 0;
-
-    const a =
-        (y * w + x) * 4 + 3;
-
-    if (data[a] < 70)
-        continue;
-
-    data[a] *=
-        0.75 +
-        Math.random() * 0.25;
-
-}
-
-/* ==========================================================
-   Làm mượt lại một chút để giống mực thật
-========================================================== */
-
-const smooth =
-    new Uint8ClampedArray(data);
-
-for (let y = 1; y < h - 1; y++) {
-
-    for (let x = 1; x < w - 1; x++) {
-
-        const a =
-            (y * w + x) * 4 + 3;
-
-        if (smooth[a] < 25)
-            continue;
-
-        const avg = (
-
-            smooth[a] +
-
-            smooth[a - 4] +
-
-            smooth[a + 4] +
-
-            smooth[a - w * 4] +
-
-            smooth[a + w * 4]
-
-        ) / 5;
-
-        data[a] =
-            smooth[a] * 0.72 +
-            avg * 0.28;
-
-    }
-
-}
-
-ctx.putImageData(img, 0, 0);
-
-}
-
-
-
-
-
-// Thực hiện vẽ chữ in hoa phác thảo cọ lên bộ nhớ tạm
-for (let k = 0; k < lines.length; k++) {
-    const lineY = startY + (k * currentFontSize * config.lineHeightRatio);
-    const cleanText = lines[k].toUpperCase();
-    
-    sCtx.strokeText(cleanText, sCenterX, lineY);
-    sCtx.fillText(cleanText, sCenterX, lineY);
-}
-
-// THUẬT TOÁN ĐÁNH NÁT VIỀN TẠO HIỆU ỨNG GAI XƯỚC MỰC BÚT LÔNG MANH MANH
-const imgData = sCtx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height);
-const data = imgData.data;
-
-for (let y = 0; y < scratchCanvas.height; y++) {
-    for (let x = 0; x < scratchCanvas.width; x++) {
-        const alphaIndex = (y * scratchCanvas.width + x) * 4 + 3;
-        const alpha = data[alphaIndex];
-
-        if (alpha > 40) {
-            // Đánh gai rìa chữ ngẫu nhiên
-            if (Math.random() > 0.4) {
-                const bX = x + Math.floor((Math.random() - 0.5) * 4);
-                const bY = y + Math.floor((Math.random() - 0.5) * 4);
-                if (bX >= 0 && bX < scratchCanvas.width && bY >= 0 && bY < scratchCanvas.height) {
-                    const tIndex = (bY * scratchCanvas.width + bX) * 4 + 3;
-                    if (data[tIndex] < 140) {
-                        data[tIndex] = alpha * (0.25 + Math.random() * 0.35);
-                    }
-                }
-            }
-            // Đục lỗ sớ xước siêu nhỏ dọc thân chữ để giả lập bề mặt bảng mica bám mực không đều
-            if (Math.random() > 0.95) {
-                data[alphaIndex] = alpha * 0.3;
-            }
-        }
-    }
-}
-
-sCtx.putImageData(imgData, 0, 0);
-
-// Đổ bóng mờ tĩnh tạo độ chìm thực tế
-ctx.shadowColor = 'rgba(15, 15, 18, 0.3)';
-ctx.shadowBlur = 2;
-ctx.shadowOffsetX = 0.8;
-ctx.shadowOffsetY = 0.8;
-
-// Ghép chữ đã xử lý hạt nhám lên bảng
-ctx.drawImage(scratchCanvas, -scratchCanvas.width / 2, -scratchCanvas.height / 2);
-ctx.restore();
+renderBaseText();
